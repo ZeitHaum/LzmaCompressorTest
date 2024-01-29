@@ -1,3 +1,0 @@
-/mnt/c/0xSelf/0xPostGraduate/env/LzmaCompressorTest/build/CMakeFiles/testcompressor.dir
-/mnt/c/0xSelf/0xPostGraduate/env/LzmaCompressorTest/build/CMakeFiles/edit_cache.dir
-/mnt/c/0xSelf/0xPostGraduate/env/LzmaCompressorTest/build/CMakeFiles/rebuild_cache.dir

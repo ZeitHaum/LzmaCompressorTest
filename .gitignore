@@ -1,4 +1,4 @@
 testcompressor
 lzma_sample
 demo
-./build
+build/
