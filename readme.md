@@ -4,12 +4,16 @@ Make sure all submodules are already initialized.
 Make testcompressor
 
 ```bash
-g++ -I7z/C/ -o testcompressor -std=c++14 -D_7ZIP_ST testcompressor.cc compressor.cc 7z/C/LzFind.c  7z/C/LzmaDec.c  7z/C/LzmaEnc.c 7z/C/CpuArch.c
+mkdir build;
+cd build;
+cmake ..;
+make;
 ```
-Make testcompressor:
+Run testcompressor:
 
 ```bash
-./testcompressor
+make 
+./build/testcompressor
 ```
 
 OutPut:

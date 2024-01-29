@@ -1,0 +1,22 @@
+cmake_minimum_required(VERSION 3.10)
+project(testcompressor)
+
+add_definitions(-D_7ZIP_ST)
+set(CMAKE_CXX_STANDARD 14)
+
+# 添加包含目录
+include_directories(7z/C/)
+
+# 添加源文件
+set(SOURCES
+    testcompressor.cc
+    compressor.cc
+    7z/C/LzFind.c
+    7z/C/LzmaDec.c
+    7z/C/LzmaEnc.c
+    7z/C/CpuArch.c
+)
+
+# 定义宏选项
+# 生成可执行文件
+add_executable(testcompressor ${SOURCES})

@@ -1,0 +1,1 @@
+/usr/bin/c++ CMakeFiles/testcompressor.dir/testcompressor.cc.o CMakeFiles/testcompressor.dir/compressor.cc.o CMakeFiles/testcompressor.dir/7z/C/LzFind.c.o CMakeFiles/testcompressor.dir/7z/C/LzmaDec.c.o CMakeFiles/testcompressor.dir/7z/C/LzmaEnc.c.o CMakeFiles/testcompressor.dir/7z/C/CpuArch.c.o -o testcompressor 
