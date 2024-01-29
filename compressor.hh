@@ -31,11 +31,13 @@ public:
     void decompress(uint8_t* src, uint64_t src_len, uint64_t& dest_len);
     //Lzma special function
     void hexdump(const uint8_t *buf, int size) ;
-private:
+private:    
+    CLzmaEncProps props;
+    SizeT propsSize;
+    uint8_t* propsEncoded;
+    void init();
     static void *_lzmaAlloc(ISzAllocPtr, size_t size);
     static void _lzmaFree(ISzAllocPtr, void *addr);
     static ISzAlloc _allocFuncs;
-    std::unique_ptr<uint8_t[]> lzmaCompress(const uint8_t *input, uint32_t inputSize, uint32_t *outputSize);
-    std::unique_ptr<uint8_t[]> lzmaDecompress(const uint8_t *input, uint32_t inputSize, uint32_t *outputSize);
 };
 #endif

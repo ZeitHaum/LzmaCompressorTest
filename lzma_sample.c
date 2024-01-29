@@ -100,7 +100,6 @@ std::unique_ptr<uint8_t[]> lzmaDecompress(const uint8_t *input, uint32_t inputSi
 }
 
 
-
 void hexdump(const uint8_t *buf, int size) {
 	int lines = (size + 15) / 16;
 	for (int i = 0; i < lines; i++) {

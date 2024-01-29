@@ -1,6 +1,7 @@
 //Compressor, author: ZeitHaum.
 #include "compressor.hh"
 #include <stdio.h>
+#include <cassert>
 
 Compressor::Compressor()
 {
@@ -30,24 +31,74 @@ inline void Compressor::ajustBuffer(uint64_t buffer_len){
 
 LzmaCompressor::LzmaCompressor()
 :Compressor()
-{}
+{
+	init();
+}
 
 LzmaCompressor::LzmaCompressor(uint64_t buffer_size)
 :Compressor(buffer_size * 4) // lzma compress_size may be larger than input
-{}
+{
+	init();
+}
+
+void LzmaCompressor::init(){
+	// prepare space for the encoded properties
+	propsSize = 5;
+	propsEncoded = new uint8_t[propsSize];
+	LzmaEncProps_Init(&props);
+	props.fb = 40;
+}
 
 void LzmaCompressor::compress(uint8_t* src, uint64_t src_len, uint64_t& dest_len){
-    uint32_t tmp = 0;
-    auto result = lzmaCompress(src, src_len, &tmp);
-    dest_len = tmp;
-    memcpy(buffer, result.get(), dest_len);
+	const SizeT off = propsSize + 8; // propsSize + decompressSize(8 bytes)
+	// set up properties
+	if (src_len >= (1 << 20))
+		props.dictSize = 1 << 20; // 1mb dictionary
+	else
+		props.dictSize = src_len; // smaller dictionary = faster!
+
+	uint64_t outputSize64 = buffer_size;
+
+	int lzmaStatus = LzmaEncode(
+		buffer + off, &outputSize64, src, src_len,
+		&props, propsEncoded, &propsSize, 0,
+		NULL,
+		&_allocFuncs, &_allocFuncs);
+
+	dest_len = outputSize64 + off;
+	if (lzmaStatus == SZ_OK) {
+		// tricky: we have to generate the LZMA header
+		// propsSize bytes properties + 8 byte uncompressed size
+		memcpy(buffer, propsEncoded, propsSize);
+		for (int i = 0; i < 8; i++)
+			buffer[propsSize + i] = (src_len >> (i * 8)) & 0xFF;
+	}
+	else{
+		assert(0);
+	}
 }
 
 void LzmaCompressor::decompress(uint8_t* src, uint64_t src_len, uint64_t& dest_len){
-    uint32_t tmp = 0;
-    auto result = lzmaDecompress(src, src_len, &tmp);
-    dest_len = tmp;
-    memcpy(buffer, result.get(), dest_len);
+	const SizeT off = propsSize + 8;
+	assert(src_len >= off &&"invalid lzma header!");
+	UInt64 size = 0;
+	for (int i = 0; i < 8; i++)
+		size |= (src[propsSize + i] << (i * 8));
+	if (size <= (256 * 1024 * 1024)) {
+		ELzmaStatus lzmaStatus;
+		SizeT procOutSize = size, procInSize = src_len - off;
+		int status = LzmaDecode(buffer, &procOutSize, src + off, &procInSize, src, propsSize, LZMA_FINISH_END, &lzmaStatus, &_allocFuncs);
+
+		if (status == SZ_OK && procOutSize == size) {
+			dest_len = size;
+		}
+		else{
+			assert(0);
+		}
+	}
+	else{
+		assert(0);
+	}
 }
 
 void* LzmaCompressor::_lzmaAlloc(ISzAllocPtr, size_t size){
@@ -64,79 +115,6 @@ ISzAlloc LzmaCompressor::_allocFuncs = {
 	LzmaCompressor::_lzmaAlloc, LzmaCompressor::_lzmaFree
 };
 
-std::unique_ptr<uint8_t[]> LzmaCompressor::lzmaCompress(const uint8_t *input, uint32_t inputSize, uint32_t *outputSize) {
-	std::unique_ptr<uint8_t[]> result;
-
-	// set up properties
-	CLzmaEncProps props;
-	LzmaEncProps_Init(&props);
-	if (inputSize >= (1 << 20))
-		props.dictSize = 1 << 20; // 1mb dictionary
-	else
-		props.dictSize = inputSize; // smaller dictionary = faster!
-	props.fb = 40;
-
-	// prepare space for the encoded properties
-	SizeT propsSize = 5;
-	uint8_t propsEncoded[5];
-
-	// allocate some space for the compression output
-	// this is way more than necessary in most cases...
-	// but better safe than sorry
-	//   (a smarter implementation would use a growing buffer,
-	//    but this requires a bunch of fuckery that is out of
-	///   scope for this simple example)
-	SizeT outputSize64 = inputSize * 1.5;
-	if (outputSize64 < 1024)
-		outputSize64 = 1024;
-	auto output = std::make_unique<uint8_t[]>(outputSize64);
-
-	int lzmaStatus = LzmaEncode(
-		output.get(), &outputSize64, input, inputSize,
-		&props, propsEncoded, &propsSize, 0,
-		NULL,
-		&_allocFuncs, &_allocFuncs);
-
-	*outputSize = outputSize64 + 13;
-	if (lzmaStatus == SZ_OK) {
-		// tricky: we have to generate the LZMA header
-		// 5 bytes properties + 8 byte uncompressed size
-		result = std::make_unique<uint8_t[]>(outputSize64 + 13);
-		uint8_t *resultData = result.get();
-
-		memcpy(resultData, propsEncoded, 5);
-		for (int i = 0; i < 8; i++)
-			resultData[5 + i] = (inputSize >> (i * 8)) & 0xFF;
-		memcpy(resultData + 13, output.get(), outputSize64);
-	}
-
-	return result;
-}
-
-std::unique_ptr<uint8_t[]> LzmaCompressor::lzmaDecompress(const uint8_t *input, uint32_t inputSize, uint32_t *outputSize){
-    if (inputSize < 13)
-		return NULL; // invalid header!
-
-	// extract the size from the header
-	UInt64 size = 0;
-	for (int i = 0; i < 8; i++)
-		size |= (input[5 + i] << (i * 8));
-
-	if (size <= (256 * 1024 * 1024)) {
-		auto blob = std::make_unique<uint8_t[]>(size);
-
-		ELzmaStatus lzmaStatus;
-		SizeT procOutSize = size, procInSize = inputSize - 13;
-		int status = LzmaDecode(blob.get(), &procOutSize, &input[13], &procInSize, input, 5, LZMA_FINISH_END, &lzmaStatus, &_allocFuncs);
-
-		if (status == SZ_OK && procOutSize == size) {
-			*outputSize = size;
-			return blob;
-		}
-	}
-
-	return NULL;
-}
 
 void LzmaCompressor::hexdump(const uint8_t *buf, int size) {
 	int lines = (size + 15) / 16;
